@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aplikasi Notulen Rapat Pro - Fullerton Health Clinic Bali</title>
+    <!-- Menggunakan Tailwind CSS untuk styling modern dan responsif -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Menggunakan Font Inter dari Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Style untuk mode cetak */
+        @media print {
+            body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .no-print { display: none !important; }
+            .print-break-inside-avoid { page-break-inside: avoid; }
+            main, #archive-modal { margin: 0; padding: 0; box-shadow: none; }
+            textarea { border: 1px solid #e2e8f0 !important; }
+        }
+        /* Animasi dan style tambahan */
+        .fade-in { animation: fadeIn 0.5s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+        .modal-overlay { background-color: rgba(0, 0, 0, 0.5); }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+
+    <div class="container mx-auto p-4 sm:p-6 lg:p-8">
+        <header class="text-center mb-6 fade-in">
+            <h1 class="text-3xl sm:text-4xl font-bold text-sky-700">Minutes of Meeting (MoM) Pro</h1>
+            <p class="text-lg text-slate-500 mt-1">Fullerton Health Clinic Bali</p>
+        </header>
+
+        <!-- Menu Aksi Global -->
+        <div class="max-w-4xl mx-auto mb-4 flex flex-wrap gap-2 justify-between items-center no-print">
+            <div>
+                <button onclick="openArchiveModal()" class="bg-white text-slate-700 px-4 py-2 rounded-lg border border-slate-300 hover:bg-slate-100 transition duration-300 font-semibold text-sm flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></svg>
+                    Arsip Rapat
+                </button>
+            </div>
+            <div class="flex gap-2">
+                <button onclick="document.getElementById('import-file').click()" class="bg-white text-slate-700 px-4 py-2 rounded-lg border border-slate-300 hover:bg-slate-100 transition duration-300 font-semibold text-sm flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                    Impor
+                </button>
+                <input type="file" id="import-file" class="hidden" accept=".json" onchange="importData(event)">
+                <button onclick="exportData()" class="bg-white text-slate-700 px-4 py-2 rounded-lg border border-slate-300 hover:bg-slate-100 transition duration-300 font-semibold text-sm flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                    Ekspor
+                </button>
+            </div>
+        </div>
+
+        <main id="main-content" class="bg-white p-6 sm:p-8 rounded-2xl shadow-lg max-w-4xl mx-auto">
+            
+            <!-- Informasi Detail Rapat -->
+            <section id="meeting-details" class="border-b pb-6 mb-6">
+                <h2 class="text-xl font-semibold mb-4 text-slate-700">Detail Rapat</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <input type="hidden" id="meeting-id">
+                    <div>
+                        <label for="meeting-topic" class="block text-sm font-medium text-slate-600 mb-1">Agenda / Topik Rapat</label>
+                        <input type="text" id="meeting-topic" class="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 transition" placeholder="Contoh: Evaluasi Kinerja Bulanan">
+                    </div>
+                    <div>
+                        <label for="meeting-date" class="block text-sm font-medium text-slate-600 mb-1">Tanggal & Waktu</label>
+                        <input type="datetime-local" id="meeting-date" class="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 transition">
+                    </div>
+                </div>
+            </section>
+
+            <!-- Daftar Kehadiran -->
+            <section id="attendance" class="border-b pb-6 mb-6 print-break-inside-avoid">
+                 <h2 class="text-xl font-semibold mb-4 text-slate-700">Daftar Kehadiran</h2>
+                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-8">
+                    <div>
+                        <h3 class="font-semibold text-slate-600 mb-2">Tenaga Medis</h3>
+                        <div id="medical-staff-list" class="space-y-2"></div>
+                    </div>
+                    <div>
+                        <h3 class="font-semibold text-slate-600 mb-2 mt-4 sm:mt-0">Staf Operasional</h3>
+                        <div id="operational-staff-list" class="space-y-2"></div>
+                    </div>
+                 </div>
+                 <div class="mt-4 flex gap-2 no-print">
+                    <input type="text" id="new-attendee-name" placeholder="Nama Peserta Baru" class="flex-grow p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 transition">
+                    <select id="new-attendee-role" class="p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 transition">
+                        <option value="medical">Tenaga Medis</option>
+                        <option value="operational">Staf Operasional</option>
+                    </select>
+                    <button onclick="addAttendee()" class="bg-sky-600 text-white px-4 py-2 rounded-lg hover:bg-sky-700 transition duration-300 font-medium">Tambah</button>
+                 </div>
+            </section>
+
+            <!-- Catatan Rapat -->
+            <section id="notes" class="border-b pb-6 mb-6 print-break-inside-avoid">
+                <h2 class="text-xl font-semibold mb-4 text-slate-700">Notulensi / Poin Pembahasan</h2>
+                <textarea id="meeting-notes" rows="10" class="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 transition" placeholder="Tuliskan poin-poin penting hasil diskusi di sini..." onkeydown="handleNotesEnter(event)" onfocus="initNotes(this)"></textarea>
+            </section>
+            
+            <!-- Butir Tindak Lanjut -->
+            <section id="action-items" class="print-break-inside-avoid">
+                <div class="flex flex-wrap justify-between items-center mb-4 gap-4">
+                    <h2 class="text-xl font-semibold text-slate-700">Butir Aksi / Tindak Lanjut</h2>
+                    <div class="flex gap-2 no-print">
+                        <select id="filter-owner" onchange="renderActionItems()" class="p-1 border border-slate-300 rounded-md text-sm"><option value="All">Semua PJ</option></select>
+                        <select id="filter-status" onchange="renderActionItems()" class="p-1 border border-slate-300 rounded-md text-sm">
+                            <option value="All">Semua Status</option>
+                            <option value="Issued">Issued</option>
+                            <option value="In Progress">In Progress</option>
+                            <option value="Closed">Closed</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="action-items-list" class="space-y-4 mb-4"></div>
+                <div class="bg-slate-50 p-4 rounded-lg no-print">
+                    <h3 class="font-semibold text-slate-600 mb-3">Tambah Butir Aksi Baru</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <input type="text" id="action-item-desc" placeholder="Deskripsi Tugas" class="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 transition">
+                        <select id="action-item-owner" class="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 transition"><option>Pilih Penanggung Jawab...</option></select>
+                        <input type="date" id="action-item-due-date" class="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 transition" title="Batas Waktu">
+                        <button onclick="addActionItem()" class="md:col-span-2 w-full bg-sky-600 text-white px-4 py-2 rounded-lg hover:bg-sky-700 transition font-medium flex items-center justify-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                            Tambahkan Aksi
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Tombol Aksi Utama -->
+            <div class="mt-8 pt-6 border-t flex flex-col sm:flex-row justify-end gap-3 no-print">
+                <button onclick="startNewMeeting()" class="bg-sky-600 text-white px-6 py-2 rounded-lg hover:bg-sky-700 transition font-semibold flex items-center justify-center gap-2">
+                     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="18" x2="12" y2="12"></line><line x1="9" y1="15" x2="15" y2="15"></line></svg>
+                    Rapat Baru
+                </button>
+                <button onclick="saveMeeting()" class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition font-semibold flex items-center justify-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+                    Simpan Notulen
+                </button>
+                <button onclick="printMeeting()" class="bg-slate-700 text-white px-6 py-2 rounded-lg hover:bg-slate-800 transition font-semibold flex items-center justify-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+                    Cetak / PDF
+                </button>
+            </div>
+        </main>
+
+        <footer class="text-center mt-8 text-slate-400 text-sm">
+            <p>&copy; 2024 Dibuat untuk Fullerton Health Clinic Bali</p>
+        </footer>
+    </div>
+
+    <!-- Modal Arsip Rapat -->
+    <div id="archive-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 modal-overlay no-print">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+            <header class="p-4 border-b flex justify-between items-center">
+                <h2 class="text-xl font-semibold text-slate-700">Arsip Rapat</h2>
+                <button onclick="closeArchiveModal()" class="text-slate-500 hover:text-slate-800">&times;</button>
+            </header>
+            <div class="p-4 border-b">
+                <input type="text" id="search-archive" onkeyup="renderArchiveList()" placeholder="Cari berdasarkan topik atau catatan..." class="w-full p-2 border border-slate-300 rounded-lg">
+            </div>
+            <div id="archive-list" class="overflow-y-auto p-4 flex-grow">
+                <!-- Daftar arsip akan dirender di sini -->
+            </div>
+        </div>
+    </div>
+    
+    <!-- Notifikasi -->
+    <div id="notification" class="hidden fixed top-5 right-5 bg-green-500 text-white py-2 px-5 rounded-lg shadow-xl transition-transform translate-x-full z-50"></div>
+
+    <script>
+    // --- DATABASE ---
+    // Mengelola semua data aplikasi
+    let appData = {
+        meetings: [],
+        attendeeMasterList: [
+            { id: 1, name: 'dr. A', role: 'medical' },
+            { id: 2, name: 'dr. B', role: 'medical' },
+            { id: 3, name: 'Perawat C', role: 'medical' },
+            { id: 4, name: 'Staf D', role: 'operational' },
+            { id: 5, name: 'Staf E', role: 'operational' },
+        ],
+        currentMeeting: null,
+    };
+
+    // --- FUNGSI UTAMA ---
+    function saveAllData() {
+        localStorage.setItem('momAppData', JSON.stringify(appData));
+    }
+
+    function loadAllData() {
+        const savedData = localStorage.getItem('momAppData');
+        if (savedData) {
+            appData = JSON.parse(savedData);
+        }
+    }
+
+    function loadMeetingIntoView(meeting) {
+        appData.currentMeeting = meeting;
+        document.getElementById('meeting-id').value = meeting.id;
+        document.getElementById('meeting-topic').value = meeting.topic;
+        document.getElementById('meeting-date').value = meeting.date;
+        document.getElementById('meeting-notes').value = meeting.notes;
+        renderAttendees();
+        renderActionItems();
+        updateOwnerDropdowns();
+    }
+
+    function startNewMeeting() {
+        saveMeeting(); // Simpan rapat saat ini sebelum membuat yang baru
+
+        const lastMeeting = appData.meetings.length > 0 ? appData.meetings[appData.meetings.length - 1] : null;
+        const openActionItems = lastMeeting ? lastMeeting.actionItems.filter(item => item.status !== 'Closed') : [];
+
+        const now = new Date();
+        now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+        
+        const newMeeting = {
+            id: Date.now(),
+            topic: '',
+            date: now.toISOString().slice(0, 16),
+            attendees: JSON.parse(JSON.stringify(appData.attendeeMasterList)).map(a => ({...a, present: false})),
+            notes: '',
+            actionItems: JSON.parse(JSON.stringify(openActionItems)),
+        };
+        
+        appData.meetings.push(newMeeting);
+        loadMeetingIntoView(newMeeting);
+        showNotification('Rapat baru dimulai. Butir aksi yang belum selesai telah dibawa.', 'info');
+    }
+
+    function saveMeeting() {
+        const meetingId = parseInt(document.getElementById('meeting-id').value);
+        if (!meetingId) return;
+
+        const meetingIndex = appData.meetings.findIndex(m => m.id === meetingId);
+        if (meetingIndex > -1) {
+            const currentMeeting = appData.meetings[meetingIndex];
+            currentMeeting.topic = document.getElementById('meeting-topic').value;
+            currentMeeting.date = document.getElementById('meeting-date').value;
+            currentMeeting.notes = document.getElementById('meeting-notes').value;
+            // Kehadiran dan butir aksi sudah diupdate secara real-time di object `currentMeeting`
+            saveAllData();
+            showNotification('Notulen berhasil disimpan!');
+        }
+    }
+    
+    // --- FUNGSI KEHADIRAN ---
+    function renderAttendees() {
+        const medicalList = document.getElementById('medical-staff-list');
+        const operationalList = document.getElementById('operational-staff-list');
+        medicalList.innerHTML = '';
+        operationalList.innerHTML = '';
+
+        appData.currentMeeting.attendees.forEach(attendee => {
+            const attendeeDiv = document.createElement('div');
+            attendeeDiv.className = 'flex items-center justify-between';
+            attendeeDiv.innerHTML = `
+                <label for="attendee-${attendee.id}" class="flex items-center cursor-pointer">
+                    <input type="checkbox" id="attendee-${attendee.id}" ${attendee.present ? 'checked' : ''} onchange="toggleAttendance(${attendee.id})" class="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500">
+                    <span class="ml-2 text-slate-700">${attendee.name}</span>
+                </label>
+                <button onclick="removeAttendee(${attendee.id})" class="no-print text-red-500 hover:text-red-700 p-1 rounded-full">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>`;
+            if (attendee.role === 'medical') medicalList.appendChild(attendeeDiv);
+            else operationalList.appendChild(attendeeDiv);
+        });
+    }
+
+    function toggleAttendance(attendeeId) {
+        const attendee = appData.currentMeeting.attendees.find(a => a.id === attendeeId);
+        if (attendee) attendee.present = !attendee.present;
+        updateOwnerDropdowns();
+    }
+    
+    function addAttendee() {
+        const name = document.getElementById('new-attendee-name').value.trim();
+        const role = document.getElementById('new-attendee-role').value;
+        if (!name) return;
+
+        const newId = appData.attendeeMasterList.length > 0 ? Math.max(...appData.attendeeMasterList.map(a => a.id)) + 1 : 1;
+        const newAttendee = { id: newId, name, role };
+        
+        // Tambahkan ke master list dan ke meeting saat ini
+        appData.attendeeMasterList.push(newAttendee);
+        appData.currentMeeting.attendees.push({...newAttendee, present: true});
+        
+        document.getElementById('new-attendee-name').value = '';
+        renderAttendees();
+        updateOwnerDropdowns();
+    }
+
+    function removeAttendee(attendeeId) {
+        // Hapus dari meeting saat ini dan master list
+        appData.currentMeeting.attendees = appData.currentMeeting.attendees.filter(a => a.id !== attendeeId);
+        appData.attendeeMasterList = appData.attendeeMasterList.filter(a => a.id !== attendeeId);
+        renderAttendees();
+        updateOwnerDropdowns();
+    }
+
+    // --- FUNGSI BUTIR AKSI ---
+    function renderActionItems() {
+        const list = document.getElementById('action-items-list');
+        list.innerHTML = '';
+        
+        const ownerFilter = document.getElementById('filter-owner').value;
+        const statusFilter = document.getElementById('filter-status').value;
+
+        const filteredItems = appData.currentMeeting.actionItems.filter(item => {
+            const ownerMatch = ownerFilter === 'All' || item.owner === ownerFilter;
+            const statusMatch = statusFilter === 'All' || item.status === statusFilter;
+            return ownerMatch && statusMatch;
+        });
+
+        if (filteredItems.length === 0) {
+            list.innerHTML = '<p class="text-slate-500 text-center italic">Tidak ada butir aksi yang cocok dengan filter.</p>';
+            return;
+        }
+
+        filteredItems.forEach(item => {
+            const itemDiv = document.createElement('div');
+            itemDiv.className = 'p-4 border rounded-lg flex flex-col gap-4 bg-white fade-in';
+            itemDiv.innerHTML = `
+                <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                    <div class="flex-1">
+                        <p class="font-medium text-slate-800">${item.desc}</p>
+                        <p class="text-sm text-slate-500"><strong>PJ:</strong> ${item.owner} | <strong>Batas Waktu:</strong> ${item.dueDate || 'N/A'}</p>
+                    </div>
+                    <div class="flex items-center gap-2 no-print w-full sm:w-auto">
+                        <select onchange="updateActionItem(this, ${item.id}, 'status')" class="p-1 border border-slate-300 rounded-md text-sm w-full sm:w-auto">
+                            <option value="Issued" ${item.status === 'Issued' ? 'selected' : ''}>Issued</option>
+                            <option value="In Progress" ${item.status === 'In Progress' ? 'selected' : ''}>In Progress</option>
+                            <option value="Closed" ${item.status === 'Closed' ? 'selected' : ''}>Closed</option>
+                        </select>
+                        <button onclick="removeActionItem(${item.id})" class="text-red-500 hover:text-red-700 p-2 rounded-full">&times;</button>
+                    </div>
+                    <div class="print-only hidden text-sm font-semibold">Status: ${item.status}</div>
+                </div>
+                <div class="no-print">
+                    <textarea oninput="updateActionItem(this, ${item.id}, 'detailFollowUp')" class="w-full mt-1 p-2 border border-slate-300 rounded-lg text-sm" rows="2" placeholder="Detail Follow-up...">${item.detailFollowUp}</textarea>
+                </div>
+                <div class="print-only hidden text-sm"><p><strong>Follow-up:</strong><br>${item.detailFollowUp.replace(/\n/g, '<br>') || 'N/A'}</p></div>`;
+            list.appendChild(itemDiv);
+        });
+    }
+
+    function addActionItem() {
+        const desc = document.getElementById('action-item-desc').value.trim();
+        const owner = document.getElementById('action-item-owner').value;
+        const dueDate = document.getElementById('action-item-due-date').value;
+
+        if (desc && owner && owner !== "Pilih Penanggung Jawab...") {
+            const newId = appData.currentMeeting.actionItems.length > 0 ? Math.max(...appData.currentMeeting.actionItems.map(a => a.id)) + 1 : 1;
+            appData.currentMeeting.actionItems.push({ id: newId, desc, owner, dueDate, status: 'Issued', detailFollowUp: '' });
+            renderActionItems();
+            document.getElementById('action-item-desc').value = '';
+            document.getElementById('action-item-due-date').value = '';
+        } else {
+            alert('Deskripsi dan Penanggung Jawab wajib diisi.');
+        }
+    }
+
+    function removeActionItem(itemId) {
+        appData.currentMeeting.actionItems = appData.currentMeeting.actionItems.filter(item => item.id !== itemId);
+        renderActionItems();
+    }
+
+    function updateActionItem(element, itemId, field) {
+        const item = appData.currentMeeting.actionItems.find(i => i.id === itemId);
+        if (item) item[field] = element.value;
+    }
+
+    function updateOwnerDropdowns() {
+        const presentAttendees = appData.currentMeeting.attendees.filter(a => a.present);
+        const ownerDropdown = document.getElementById('action-item-owner');
+        const filterDropdown = document.getElementById('filter-owner');
+        
+        ownerDropdown.innerHTML = '<option>Pilih Penanggung Jawab...</option>';
+        filterDropdown.innerHTML = '<option value="All">Semua PJ</option>';
+
+        presentAttendees.forEach(a => {
+            ownerDropdown.innerHTML += `<option value="${a.name}">${a.name}</option>`;
+        });
+        appData.attendeeMasterList.forEach(a => {
+             filterDropdown.innerHTML += `<option value="${a.name}">${a.name}</option>`;
+        });
+    }
+
+    // --- FUNGSI ARSIP & PENCARIAN ---
+    function openArchiveModal() { document.getElementById('archive-modal').classList.remove('hidden'); renderArchiveList(); }
+    function closeArchiveModal() { document.getElementById('archive-modal').classList.add('hidden'); }
+    
+    function renderArchiveList() {
+        const listEl = document.getElementById('archive-list');
+        const keyword = document.getElementById('search-archive').value.toLowerCase();
+        listEl.innerHTML = '';
+        
+        const filteredMeetings = appData.meetings.filter(m => 
+            m.topic.toLowerCase().includes(keyword) || m.notes.toLowerCase().includes(keyword)
+        ).sort((a, b) => b.id - a.id); // Urutkan terbaru di atas
+
+        if (filteredMeetings.length === 0) {
+            listEl.innerHTML = '<p class="text-slate-500 text-center">Tidak ada rapat yang ditemukan.</p>';
+            return;
+        }
+
+        filteredMeetings.forEach(m => {
+            listEl.innerHTML += `
+                <div class="p-3 border-b hover:bg-slate-50 cursor-pointer" onclick="loadMeetingFromArchive(${m.id})">
+                    <p class="font-semibold text-slate-800">${m.topic || 'Rapat Tanpa Topik'}</p>
+                    <p class="text-sm text-slate-500">${new Date(m.date).toLocaleString('id-ID')}</p>
+                </div>`;
+        });
+    }
+    
+    function loadMeetingFromArchive(meetingId) {
+        const meeting = appData.meetings.find(m => m.id === meetingId);
+        if (meeting) {
+            saveMeeting(); // Simpan pekerjaan saat ini sebelum beralih
+            loadMeetingIntoView(meeting);
+        }
+        closeArchiveModal();
+    }
+
+    // --- FUNGSI UTILITAS ---
+    function initNotes(textarea) { if (textarea.value.trim() === '') textarea.value = '• '; }
+    function handleNotesEnter(event) {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            const textarea = event.target;
+            const textToInsert = '\n• ';
+            const cursorPos = textarea.selectionStart;
+            textarea.value = textarea.value.substring(0, cursorPos) + textToInsert + textarea.value.substring(textarea.selectionEnd);
+            textarea.selectionStart = textarea.selectionEnd = cursorPos + textToInsert.length;
+        }
+    }
+    
+    function printMeeting() { window.print(); }
+    
+    function showNotification(message, type = 'success') {
+        const notification = document.getElementById('notification');
+        notification.textContent = message;
+        notification.className = `fixed top-5 right-5 text-white py-2 px-5 rounded-lg shadow-xl transition-transform z-50 ${type === 'success' ? 'bg-green-500' : 'bg-sky-500'}`;
+        notification.classList.remove('hidden', 'translate-x-full');
+        setTimeout(() => notification.classList.add('translate-x-full'), 3000);
+    }
+
+    // --- FUNGSI EKSPOR / IMPOR ---
+    function exportData() {
+        saveMeeting(); // Pastikan data terbaru ikut tersimpan
+        const dataStr = JSON.stringify(appData, null, 2);
+        const dataBlob = new Blob([dataStr], {type: "application/json"});
+        const url = URL.createObjectURL(dataBlob);
+        const link = document.createElement('a');
+        link.download = `mom_backup_${new Date().toISOString().slice(0,10)}.json`;
+        link.href = url;
+        link.click();
+        URL.revokeObjectURL(url);
+        showNotification('Data berhasil diekspor!');
+    }
+
+    function importData(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const importedData = JSON.parse(e.target.result);
+                // Validasi sederhana
+                if (importedData.meetings && importedData.attendeeMasterList) {
+                    appData = importedData;
+                    saveAllData();
+                    initialize();
+                    showNotification('Data berhasil diimpor!');
+                } else {
+                    alert('Format file tidak valid.');
+                }
+            } catch (error) {
+                alert('Gagal membaca file. Pastikan file dalam format JSON yang benar.');
+            }
+        };
+        reader.readAsText(file);
+    }
+    
+    // --- INISIALISASI ---
+    function initialize() {
+        loadAllData();
+        if (appData.meetings.length === 0) {
+            // Jika benar-benar baru, buat rapat pertama
+            startNewMeeting();
+        } else {
+            // Muat rapat terakhir yang ada di arsip
+            const lastMeeting = appData.meetings[appData.meetings.length - 1];
+            loadMeetingIntoView(lastMeeting);
+        }
+    }
+
+    window.onload = initialize;
+    </script>
+</body>
+</html>
+
