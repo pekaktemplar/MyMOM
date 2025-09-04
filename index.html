@@ -20,34 +20,34 @@
         }
         /* Style untuk mode cetak */
         @media print {
-            /* Aturan ini memastikan browser mencetak semua konten, 
-               membiarkannya mengalir ke beberapa halaman jika perlu. */
             body { 
                 -webkit-print-color-adjust: exact; 
                 print-color-adjust: exact;
-                width: 100%;
-                height: auto;
-                overflow: visible;
             }
             main, #app-container {
-                overflow: visible !important;
-                height: auto !important;
                 box-shadow: none;
                 margin: 0;
                 padding: 0;
             }
             .no-print { display: none !important; }
             .print-break-inside-avoid { page-break-inside: avoid; }
-            textarea { 
-                border: 1px solid #e2e8f0 !important; 
-                /* Tampilkan seluruh isi textarea saat dicetak (dikelola oleh JS) */
-                overflow: visible !important;
+            /* Memastikan border terlihat saat dicetak */
+            .printable-content {
+                border: 1px solid #e2e8f0 !important;
             }
         }
         /* Animasi dan style tambahan */
         .fade-in { animation: fadeIn 0.5s ease-in-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
         .modal-overlay { background-color: rgba(0, 0, 0, 0.5); }
+
+        /* Placeholder untuk contenteditable div */
+        [contenteditable="true"]:empty::before {
+            content: attr(data-placeholder);
+            color: #9ca3af; /* Tailwind's gray-400 */
+            pointer-events: none;
+            display: block; /* Agar placeholder muncul */
+        }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800">
@@ -150,7 +150,11 @@
             <!-- Catatan Rapat -->
             <section id="notes" class="border-b pb-6 mb-6 print-break-inside-avoid">
                 <h2 class="text-xl font-semibold mb-4 text-slate-700">Notulensi / Poin Pembahasan</h2>
-                <textarea id="meeting-notes" rows="10" class="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 transition leading-relaxed" placeholder="Tuliskan poin-poin penting hasil diskusi di sini..." onkeydown="handleNotesEnter(event)" onfocus="initNotes(this)"></textarea>
+                <div id="meeting-notes" contenteditable="true"
+                     class="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 transition leading-relaxed min-h-[120px] printable-content"
+                     data-placeholder="Tuliskan poin-poin penting hasil diskusi di sini..."
+                     onkeydown="handleNotesEnter(event)" onfocus="initNotes(this)" onblur="saveMeetingNotes()">
+                </div>
             </section>
             
             <!-- Butir Tindak Lanjut -->
@@ -391,7 +395,7 @@
         document.getElementById('meeting-id').value = meeting.id;
         document.getElementById('meeting-topic').value = meeting.topic;
         document.getElementById('meeting-date').value = meeting.date;
-        document.getElementById('meeting-notes').value = meeting.notes;
+        document.getElementById('meeting-notes').innerHTML = meeting.notes || '';
         initNotes(document.getElementById('meeting-notes'));
         renderAttendees();
         renderActionItems();
@@ -424,6 +428,11 @@
         loadMeetingIntoView(newMeeting);
         showNotification('Rapat baru dimulai. Butir aksi yang belum selesai telah dibawa.', 'info');
     }
+    
+    function saveMeetingNotes() {
+        if (!appData.currentMeeting) return;
+        appData.currentMeeting.notes = document.getElementById('meeting-notes').innerHTML;
+    }
 
     async function saveMeeting() {
         if (!appData.currentMeeting) return;
@@ -434,7 +443,7 @@
             // Update data dari UI ke object appData.currentMeeting
             appData.currentMeeting.topic = document.getElementById('meeting-topic').value;
             appData.currentMeeting.date = document.getElementById('meeting-date').value;
-            appData.currentMeeting.notes = document.getElementById('meeting-notes').value;
+            saveMeetingNotes(); // Simpan isi dari div
             
             // Salin object yang sudah diupdate ke array meetings utama
             appData.meetings[meetingIndex] = appData.currentMeeting;
@@ -524,18 +533,21 @@
     function handleNotesEnter(event) {
         if (event.key === 'Enter') {
             event.preventDefault();
-            const textarea = event.target;
-            const start = textarea.selectionStart;
-            const end = textarea.selectionEnd;
-            const text = textarea.value;
-            textarea.value = text.substring(0, start) + '\n• ' + text.substring(end);
-            textarea.selectionStart = textarea.selectionEnd = start + 3;
+            // Cara modern untuk menyisipkan HTML di posisi kursor
+            document.execCommand('insertHTML', false, '<br>•&nbsp;');
         }
     }
 
-    function initNotes(textarea) {
-        if (textarea.value.trim() === '') {
-            textarea.value = '• ';
+    function initNotes(element) {
+        if (element.innerHTML.trim() === '' || element.innerHTML.trim() === '<br>') {
+            element.innerHTML = '•&nbsp;';
+            // Pindahkan kursor setelah bullet point
+            const range = document.createRange();
+            const sel = window.getSelection();
+            range.setStart(element.childNodes[0], 2);
+            range.collapse(true);
+            sel.removeAllRanges();
+            sel.addRange(range);
         }
     }
 
@@ -565,7 +577,7 @@
             const isOverdue = dueDate && !isClosed && (new Date(dueDate.toDateString()) < new Date(new Date().toDateString()));
             
             listEl.innerHTML += `
-                <div class="border rounded-lg p-4 ${isClosed ? 'bg-slate-100 text-slate-500' : 'bg-white'}">
+                <div class="border rounded-lg p-4 ${isClosed ? 'bg-slate-100 text-slate-500' : 'bg-white'} print-break-inside-avoid">
                     <div class="flex flex-wrap justify-between items-start gap-2">
                         <p class="flex-grow ${isClosed ? 'line-through' : ''}">${item.description}</p>
                         <div class="flex items-center gap-3 text-sm">
@@ -578,7 +590,12 @@
                             <span class="${isOverdue ? 'text-red-500 font-semibold' : 'text-slate-500'}">${item.dueDate || ''}</span>
                         </div>
                     </div>
-                    <textarea onchange="updateActionItem(${item.id}, 'followUp', this.value)" class="w-full mt-2 p-2 bg-slate-50 text-sm border rounded-md leading-relaxed" placeholder="Detail follow up...">${item.followUp || ''}</textarea>
+                    <div onblur="updateActionItem(${item.id}, 'followUp', this)" 
+                         class="w-full mt-2 p-2 bg-slate-50 text-sm border rounded-md leading-relaxed min-h-[40px] printable-content" 
+                         contenteditable="true"
+                         data-placeholder="Detail follow up...">
+                         ${item.followUp || ''}
+                    </div>
                     <div class="flex gap-2 mt-2 no-print">
                         <select onchange="updateActionItem(${item.id}, 'status', this.value)" class="p-1 border rounded-md text-sm">
                             <option value="Issued" ${item.status === 'Issued' ? 'selected' : ''}>Issued</option>
@@ -615,12 +632,16 @@
         dueDateInput.value = '';
     }
 
-    function updateActionItem(itemId, field, value) {
+    function updateActionItem(itemId, field, control) {
         if (!appData.currentMeeting) return;
         const item = appData.currentMeeting.actionItems.find(i => i.id === itemId);
         if (item) {
+            // Membedakan antara input dari <select> (string) dan <div> (elemen)
+            const value = typeof control === 'string' ? control : control.innerHTML;
             item[field] = value;
-            renderActionItems(); // Re-render untuk update tampilan (misal: warna, coretan)
+            if (field === 'status') {
+                renderActionItems(); // Re-render hanya jika status berubah untuk update tampilan
+            }
         }
     }
 
@@ -662,34 +683,10 @@
 
     // --- FUNGSI CETAK ---
     function printMeeting() {
+        // Karena kita sudah tidak menggunakan textarea yang di-scroll,
+        // fungsi cetak standar sudah cukup.
         window.print();
     }
-
-    // Menangani penyesuaian tinggi textarea secara otomatis sebelum dan sesudah mencetak
-    // untuk memastikan semua konten tercapture di PDF.
-    window.onbeforeprint = () => {
-        // Sebelum mencetak, paksa semua textarea untuk menyesuaikan tingginya
-        // agar seluruh kontennya terlihat dan bisa tercetak.
-        document.querySelectorAll('textarea').forEach(textarea => {
-            // Simpan tinggi asli jika ada, untuk dikembalikan nanti
-            if (!textarea.dataset.originalHeight) {
-                textarea.dataset.originalHeight = textarea.style.height;
-            }
-            // Atur tinggi secara dinamis berdasarkan konten di dalamnya
-            textarea.style.height = 'auto'; // Reset tinggi untuk mendapatkan scrollHeight yang akurat
-            textarea.style.height = `${textarea.scrollHeight}px`; // Set tinggi sesuai konten
-        });
-    };
-
-    window.onafterprint = () => {
-        // Setelah mencetak, kembalikan tinggi semua textarea ke kondisi semula
-        // agar scrollbar muncul kembali di layar.
-        document.querySelectorAll('textarea').forEach(textarea => {
-            textarea.style.height = textarea.dataset.originalHeight || '';
-            delete textarea.dataset.originalHeight; // Hapus data sementara
-        });
-    };
-
 
     // --- FUNGSI ARSIP (MODAL) ---
     function openArchiveModal() {
@@ -731,8 +728,9 @@
     }
 
     async function deleteMeeting(meetingId) {
-        // Untuk menghindari penghapusan tidak sengaja, idealnya gunakan modal konfirmasi.
-        // Di sini kita langsung proses. Pengguna disarankan menggunakan fitur Ekspor untuk backup.
+        if (!confirm('Apakah Anda yakin ingin menghapus notulen ini? Aksi ini tidak bisa dibatalkan.')) {
+            return;
+        }
         const meetingIndex = appData.meetings.findIndex(m => m.id === meetingId);
         
         if (meetingIndex > -1) {
