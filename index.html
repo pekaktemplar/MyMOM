@@ -10,6 +10,10 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Firebase SDK (Compatibility version for easier integration) -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     <style>
         body {
             font-family: 'Inter', sans-serif;
@@ -30,11 +34,38 @@
 </head>
 <body class="bg-slate-50 text-slate-800">
 
-    <div class="container mx-auto p-4 sm:p-6 lg:p-8">
+    <!-- Container untuk Login -->
+    <div id="login-container" class="hidden min-h-screen flex flex-col items-center justify-center p-4">
+        <div class="w-full max-w-sm text-center">
+            <h1 class="text-3xl sm:text-4xl font-bold text-sky-700">MoM Pro</h1>
+            <p class="text-lg text-slate-500 mt-1 mb-8">Fullerton Health Clinic Bali</p>
+            <button onclick="signInWithGoogle()" class="w-full bg-white text-slate-700 px-4 py-3 rounded-lg border border-slate-300 hover:bg-slate-100 transition duration-300 font-semibold flex items-center justify-center gap-3">
+                <svg class="w-5 h-5" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"></path><path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"></path><path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.222,0-9.565-3.463-11.127-8.169l-6.571,4.819C9.656,39.663,16.318,44,24,44z"></path><path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.571l6.19,5.238C39.902,36.639,44,30.886,44,24C44,22.659,43.862,21.35,43.611,20.083z"></path></svg>
+                Login dengan Google
+            </button>
+        </div>
+    </div>
+    
+    <!-- Container untuk Akses Ditolak -->
+    <div id="access-denied-container" class="hidden min-h-screen flex flex-col items-center justify-center p-4 text-center">
+         <h1 class="text-2xl font-bold text-red-600">Akses Ditolak</h1>
+         <p class="text-slate-600 mt-2">Maaf, alamat email Anda tidak terdaftar untuk mengakses aplikasi ini.</p>
+         <p id="denied-email" class="text-sm text-slate-500 font-mono my-4"></p>
+         <button onclick="signOut()" class="bg-slate-700 text-white px-6 py-2 rounded-lg hover:bg-slate-800 transition">Logout</button>
+    </div>
+
+    <!-- Container Utama Aplikasi (hidden by default) -->
+    <div id="app-container" class="hidden container mx-auto p-4 sm:p-6 lg:p-8">
         <header class="text-center mb-6 fade-in">
             <h1 class="text-3xl sm:text-4xl font-bold text-sky-700">Minutes of Meeting (MoM) Pro</h1>
             <p class="text-lg text-slate-500 mt-1">Fullerton Health Clinic Bali</p>
         </header>
+        
+        <!-- Info Pengguna dan Logout -->
+        <div id="user-info" class="max-w-4xl mx-auto mb-4 flex justify-end items-center gap-3 no-print">
+            <span id="user-email" class="text-sm text-slate-600"></span>
+            <button onclick="signOut()" class="bg-white text-slate-500 text-xs px-3 py-1 rounded-md border border-slate-300 hover:bg-slate-100 transition">Logout</button>
+        </div>
 
         <!-- Menu Aksi Global -->
         <div class="max-w-4xl mx-auto mb-4 flex flex-wrap gap-2 justify-between items-center no-print">
@@ -175,141 +206,327 @@
     <div id="notification" class="hidden fixed top-5 right-5 bg-green-500 text-white py-2 px-5 rounded-lg shadow-xl transition-transform translate-x-full z-50"></div>
 
     <script>
+    // ▼▼▼ 1. TEMPEL KODE FIREBASE CONFIG ANDA DI SINI ▼▼▼
+    // Dapatkan kode ini dari Project Settings di Firebase Console Anda
+    const firebaseConfig = {
+        apiKey: "AIzaSyAyejEiJg2rAqjUMhmsyjKEyUUJa4wdVhg",
+        authDomain: "mymom-7f522.firebaseapp.com",
+        projectId: "mymom-7f522",
+        storageBucket: "mymom-7f522.firebasestorage.app",
+        messagingSenderId: "528290589165",
+        appId: "1:528290589165:web:17805c40f15fce2fa0dfe4"
+    };
+
+    // ▼▼▼ 2. (PENTING) CANTUMKAN ALAMAT EMAIL YANG DIBERIKAN AKSES DI SINI ▼▼▼
+    // Hanya email di dalam daftar ini yang bisa mengakses aplikasi setelah login.
+    const authorizedEmails = [
+        "pekaktemplar@gmail.com",
+        "nurse.tmcbali@gmail.com",
+        "agusbudiarthalg@gmail.com"
+        // Tambahkan email lainnya di sini
+    ];
+    // ▲▲▲ JANGAN UBAH KODE DI BAWAHNYA ▲▲▲
+
+    let db;
+    let auth;
+    // ▼▼▼ 3. INISIALISASI FIREBASE (JANGAN DIUBAH) ▼▼▼
+    try {
+        if (firebaseConfig.apiKey && !firebaseConfig.apiKey.includes("GANTI_DENGAN")) {
+            firebase.initializeApp(firebaseConfig);
+            db = firebase.firestore();
+            auth = firebase.auth();
+            console.log("Firebase successfully initialized.");
+        } else {
+            console.warn("Firebase config is not set. Login will not work.");
+        }
+    } catch (e) {
+        console.error("Error initializing Firebase:", e);
+    }
+    // ▲▲▲ END OF FIREBASE INIT ▲▲▲
+
+    // --- MANAJEMEN UI ---
+    const loginContainer = document.getElementById('login-container');
+    const appContainer = document.getElementById('app-container');
+    const accessDeniedContainer = document.getElementById('access-denied-container');
+
+    // --- FUNGSI OTENTIKASI ---
+    function signInWithGoogle() {
+        if (!auth) {
+            alert("Firebase belum dikonfigurasi. Login tidak bisa dilakukan.");
+            return;
+        }
+        const provider = new firebase.auth.GoogleAuthProvider();
+        auth.signInWithPopup(provider).catch(error => {
+            console.error("Login Error:", error);
+            alert("Gagal login: " + error.message);
+        });
+    }
+
+    function signOut() {
+        if (auth) {
+            auth.signOut();
+        }
+    }
+
+    // --- PEMERIKSA STATUS LOGIN (ENTRY POINT UTAMA) ---
+    function initAuth() {
+        if (!auth) {
+            // Jika firebase tidak ada, tampilkan login screen saja
+            loginContainer.classList.remove('hidden');
+            return;
+        }
+
+        auth.onAuthStateChanged(user => {
+            if (user) {
+                // Pengguna sudah login
+                if (authorizedEmails.includes(user.email)) {
+                    // Email terdaftar, tampilkan aplikasi
+                    loginContainer.classList.add('hidden');
+                    accessDeniedContainer.classList.add('hidden');
+                    appContainer.classList.remove('hidden');
+                    document.getElementById('user-email').textContent = user.email;
+                    initializeApp(); // Mulai aplikasi utama
+                } else {
+                    // Email tidak terdaftar
+                    loginContainer.classList.add('hidden');
+                    appContainer.classList.add('hidden');
+                    accessDeniedContainer.classList.remove('hidden');
+                    document.getElementById('denied-email').textContent = user.email;
+                }
+            } else {
+                // Pengguna belum login
+                appContainer.classList.add('hidden');
+                accessDeniedContainer.classList.add('hidden');
+                loginContainer.classList.remove('hidden');
+            }
+        });
+    }
+
+
     // --- DATABASE ---
     // Mengelola semua data aplikasi
     let appData = {
+        attendeeList: {
+            medical: [
+                "dr. I Gede Tirtayasa, M.Biomed",
+                "dr. Luh Gede Puspita Dewi",
+                "dr. Komang Triska D.",
+                "dr. Putu Candra Wiguna"
+            ],
+            operational: [
+                "Ni Kadek Ayu",
+                "Ni Nyoman Tri",
+                "I Gusti Agung Diah",
+                "A. A. Sagung Istri"
+            ]
+        },
         meetings: [],
-        attendeeMasterList: [
-            { id: 1, name: 'dr. A', role: 'medical' },
-            { id: 2, name: 'dr. B', role: 'medical' },
-            { id: 3, name: 'Perawat C', role: 'medical' },
-            { id: 4, name: 'Staf D', role: 'operational' },
-            { id: 5, name: 'Staf E', role: 'operational' },
-        ],
         currentMeeting: null,
     };
 
     // --- FUNGSI UTAMA ---
-    function saveAllData() {
-        localStorage.setItem('momAppData', JSON.stringify(appData));
+    async function saveAllData() {
+        if (db) {
+            try {
+                // Saat menggunakan Firestore, lebih baik menyimpan data dalam format objek JS murni
+                const dataToSave = JSON.parse(JSON.stringify(appData));
+                await db.collection("mom-data").doc("main").set(dataToSave);
+            } catch (e) {
+                console.error("Error saving to Firestore:", e, "Saving to local storage as fallback.");
+                localStorage.setItem('momAppData', JSON.stringify(appData));
+            }
+        } else {
+            localStorage.setItem('momAppData', JSON.stringify(appData));
+        }
     }
 
-    function loadAllData() {
-        const savedData = localStorage.getItem('momAppData');
-        if (savedData) {
-            appData = JSON.parse(savedData);
+    async function loadAllData() {
+        if (db) {
+            try {
+                const docRef = await db.collection("mom-data").doc("main").get();
+                if (docRef.exists) {
+                    const loadedData = docRef.data();
+                    // Pastikan semua properti ada untuk menghindari error
+                    appData.attendeeList = loadedData.attendeeList || { medical: [], operational: [] };
+                    appData.meetings = loadedData.meetings || [];
+                    appData.currentMeeting = loadedData.currentMeeting || null;
+                    console.log("Data loaded from Firestore.");
+                } else {
+                     console.log("No online data found. Starting fresh.");
+                }
+            } catch (e) {
+                console.error("Error loading from Firestore:", e, "Falling back to local storage.");
+                const savedData = localStorage.getItem('momAppData');
+                if (savedData) appData = JSON.parse(savedData);
+            }
+        } else {
+            const savedData = localStorage.getItem('momAppData');
+            if (savedData) {
+                appData = JSON.parse(savedData);
+            }
         }
     }
 
     function loadMeetingIntoView(meeting) {
+        if (!meeting) return;
         appData.currentMeeting = meeting;
         document.getElementById('meeting-id').value = meeting.id;
         document.getElementById('meeting-topic').value = meeting.topic;
         document.getElementById('meeting-date').value = meeting.date;
         document.getElementById('meeting-notes').value = meeting.notes;
+        initNotes(document.getElementById('meeting-notes'));
         renderAttendees();
         renderActionItems();
         updateOwnerDropdowns();
     }
 
-    function startNewMeeting() {
-        saveMeeting(); // Simpan rapat saat ini sebelum membuat yang baru
+    async function startNewMeeting() {
+        if (appData.currentMeeting) {
+            await saveMeeting(); // Simpan rapat saat ini sebelum membuat yang baru
+        }
 
         const lastMeeting = appData.meetings.length > 0 ? appData.meetings[appData.meetings.length - 1] : null;
         const openActionItems = lastMeeting ? lastMeeting.actionItems.filter(item => item.status !== 'Closed') : [];
 
-        const now = new Date();
-        now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-        
         const newMeeting = {
             id: Date.now(),
             topic: '',
-            date: now.toISOString().slice(0, 16),
-            attendees: JSON.parse(JSON.stringify(appData.attendeeMasterList)).map(a => ({...a, present: false})),
+            date: new Date().toISOString().slice(0, 16),
             notes: '',
-            actionItems: JSON.parse(JSON.stringify(openActionItems)),
+            attendees: JSON.parse(JSON.stringify(appData.attendeeList)), // Salin daftar default
+            actionItems: openActionItems.map(item => ({...item, id: Date.now() + Math.random()})) // Bawa item aksi yg belum selesai
         };
         
+        // Tandai semua peserta sebagai tidak hadir secara default
+        for (const role in newMeeting.attendees) {
+            newMeeting.attendees[role] = newMeeting.attendees[role].map(name => ({name, present: false}));
+        }
+
         appData.meetings.push(newMeeting);
         loadMeetingIntoView(newMeeting);
         showNotification('Rapat baru dimulai. Butir aksi yang belum selesai telah dibawa.', 'info');
     }
 
-    function saveMeeting() {
-        const meetingId = parseInt(document.getElementById('meeting-id').value);
-        if (!meetingId) return;
-
+    async function saveMeeting() {
+        if (!appData.currentMeeting) return;
+        const meetingId = appData.currentMeeting.id;
+        
         const meetingIndex = appData.meetings.findIndex(m => m.id === meetingId);
         if (meetingIndex > -1) {
-            const currentMeeting = appData.meetings[meetingIndex];
-            currentMeeting.topic = document.getElementById('meeting-topic').value;
-            currentMeeting.date = document.getElementById('meeting-date').value;
-            currentMeeting.notes = document.getElementById('meeting-notes').value;
-            // Kehadiran dan butir aksi sudah diupdate secara real-time di object `currentMeeting`
-            saveAllData();
+            // Update data dari UI ke object appData.currentMeeting
+            appData.currentMeeting.topic = document.getElementById('meeting-topic').value;
+            appData.currentMeeting.date = document.getElementById('meeting-date').value;
+            appData.currentMeeting.notes = document.getElementById('meeting-notes').value;
+            
+            // Salin object yang sudah diupdate ke array meetings utama
+            appData.meetings[meetingIndex] = appData.currentMeeting;
+            
+            await saveAllData();
             showNotification('Notulen berhasil disimpan!');
         }
     }
     
     // --- FUNGSI KEHADIRAN ---
     function renderAttendees() {
-        const medicalList = document.getElementById('medical-staff-list');
-        const operationalList = document.getElementById('operational-staff-list');
-        medicalList.innerHTML = '';
-        operationalList.innerHTML = '';
+        const medicalListEl = document.getElementById('medical-staff-list');
+        const operationalListEl = document.getElementById('operational-staff-list');
+        medicalListEl.innerHTML = '';
+        operationalListEl.innerHTML = '';
 
-        appData.currentMeeting.attendees.forEach(attendee => {
-            const attendeeDiv = document.createElement('div');
-            attendeeDiv.className = 'flex items-center justify-between';
-            attendeeDiv.innerHTML = `
-                <label for="attendee-${attendee.id}" class="flex items-center cursor-pointer">
-                    <input type="checkbox" id="attendee-${attendee.id}" ${attendee.present ? 'checked' : ''} onchange="toggleAttendance(${attendee.id})" class="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500">
-                    <span class="ml-2 text-slate-700">${attendee.name}</span>
-                </label>
-                <button onclick="removeAttendee(${attendee.id})" class="no-print text-red-500 hover:text-red-700 p-1 rounded-full">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                </button>`;
-            if (attendee.role === 'medical') medicalList.appendChild(attendeeDiv);
-            else operationalList.appendChild(attendeeDiv);
+        if (!appData.currentMeeting) return;
+        
+        const currentAttendees = appData.currentMeeting.attendees;
+
+        currentAttendees.medical.forEach(attendee => {
+            medicalListEl.innerHTML += `
+                <div class="flex items-center justify-between">
+                    <label class="flex items-center gap-2 text-slate-700">
+                        <input type="checkbox" ${attendee.present ? 'checked' : ''} onchange="toggleAttendance('${attendee.name}', 'medical')">
+                        ${attendee.name}
+                    </label>
+                    <button onclick="removeAttendee('${attendee.name}', 'medical')" class="text-slate-400 hover:text-red-500 text-xs no-print">&times;</button>
+                </div>`;
         });
-    }
-
-    function toggleAttendance(attendeeId) {
-        const attendee = appData.currentMeeting.attendees.find(a => a.id === attendeeId);
-        if (attendee) attendee.present = !attendee.present;
+        
+        currentAttendees.operational.forEach(attendee => {
+            operationalListEl.innerHTML += `
+                <div class="flex items-center justify-between">
+                    <label class="flex items-center gap-2 text-slate-700">
+                        <input type="checkbox" ${attendee.present ? 'checked' : ''} onchange="toggleAttendance('${attendee.name}', 'operational')">
+                        ${attendee.name}
+                    </label>
+                    <button onclick="removeAttendee('${attendee.name}', 'operational')" class="text-slate-400 hover:text-red-500 text-xs no-print">&times;</button>
+                </div>`;
+        });
+        
         updateOwnerDropdowns();
     }
-    
+
     function addAttendee() {
-        const name = document.getElementById('new-attendee-name').value.trim();
-        const role = document.getElementById('new-attendee-role').value;
+        const nameInput = document.getElementById('new-attendee-name');
+        const roleSelect = document.getElementById('new-attendee-role');
+        const name = nameInput.value.trim();
+        const role = roleSelect.value;
         if (!name) return;
 
-        const newId = appData.attendeeMasterList.length > 0 ? Math.max(...appData.attendeeMasterList.map(a => a.id)) + 1 : 1;
-        const newAttendee = { id: newId, name, role };
-        
-        // Tambahkan ke master list dan ke meeting saat ini
-        appData.attendeeMasterList.push(newAttendee);
-        appData.currentMeeting.attendees.push({...newAttendee, present: true});
-        
-        document.getElementById('new-attendee-name').value = '';
+        // Tambahkan ke daftar default untuk rapat berikutnya
+        if (!appData.attendeeList[role].includes(name)) {
+            appData.attendeeList[role].push(name);
+        }
+
+        // Tambahkan ke rapat saat ini
+        if (appData.currentMeeting && !appData.currentMeeting.attendees[role].find(p => p.name === name)) {
+            appData.currentMeeting.attendees[role].push({ name, present: true });
+        }
+
+        nameInput.value = '';
         renderAttendees();
+    }
+
+    function removeAttendee(name, role) {
+        // Hapus dari daftar default
+        appData.attendeeList[role] = appData.attendeeList[role].filter(p => p !== name);
+        // Hapus dari rapat saat ini
+        if (appData.currentMeeting) {
+            appData.currentMeeting.attendees[role] = appData.currentMeeting.attendees[role].filter(p => p.name !== name);
+        }
+        renderAttendees();
+    }
+
+    function toggleAttendance(name, role) {
+        if (!appData.currentMeeting) return;
+        const person = appData.currentMeeting.attendees[role].find(p => p.name === name);
+        if (person) {
+            person.present = !person.present;
+        }
         updateOwnerDropdowns();
     }
 
-    function removeAttendee(attendeeId) {
-        // Hapus dari meeting saat ini dan master list
-        appData.currentMeeting.attendees = appData.currentMeeting.attendees.filter(a => a.id !== attendeeId);
-        appData.attendeeMasterList = appData.attendeeMasterList.filter(a => a.id !== attendeeId);
-        renderAttendees();
-        updateOwnerDropdowns();
+    // --- FUNGSI CATATAN ---
+    function handleNotesEnter(event) {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            const textarea = event.target;
+            const start = textarea.selectionStart;
+            const end = textarea.selectionEnd;
+            const text = textarea.value;
+            textarea.value = text.substring(0, start) + '\n• ' + text.substring(end);
+            textarea.selectionStart = textarea.selectionEnd = start + 3;
+        }
+    }
+
+    function initNotes(textarea) {
+        if (textarea.value.trim() === '') {
+            textarea.value = '• ';
+        }
     }
 
     // --- FUNGSI BUTIR AKSI ---
     function renderActionItems() {
-        const list = document.getElementById('action-items-list');
-        list.innerHTML = '';
-        
+        const listEl = document.getElementById('action-items-list');
+        listEl.innerHTML = '';
+        if (!appData.currentMeeting) return;
+
         const ownerFilter = document.getElementById('filter-owner').value;
         const statusFilter = document.getElementById('filter-status').value;
 
@@ -320,91 +537,135 @@
         });
 
         if (filteredItems.length === 0) {
-            list.innerHTML = '<p class="text-slate-500 text-center italic">Tidak ada butir aksi yang cocok dengan filter.</p>';
+            listEl.innerHTML = '<p class="text-slate-500 text-center italic">Tidak ada butir aksi yang sesuai filter.</p>';
             return;
         }
 
         filteredItems.forEach(item => {
-            const itemDiv = document.createElement('div');
-            itemDiv.className = 'p-4 border rounded-lg flex flex-col gap-4 bg-white fade-in';
-            itemDiv.innerHTML = `
-                <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                    <div class="flex-1">
-                        <p class="font-medium text-slate-800">${item.desc}</p>
-                        <p class="text-sm text-slate-500"><strong>PJ:</strong> ${item.owner} | <strong>Batas Waktu:</strong> ${item.dueDate || 'N/A'}</p>
+            const isClosed = item.status === 'Closed';
+            const dueDate = item.dueDate ? new Date(item.dueDate) : null;
+            const isOverdue = dueDate && !isClosed && (new Date(dueDate.toDateString()) < new Date(new Date().toDateString()));
+            
+            listEl.innerHTML += `
+                <div class="border rounded-lg p-4 ${isClosed ? 'bg-slate-100 text-slate-500' : 'bg-white'}">
+                    <div class="flex flex-wrap justify-between items-start gap-2">
+                        <p class="flex-grow ${isClosed ? 'line-through' : ''}">${item.description}</p>
+                        <div class="flex items-center gap-3 text-sm">
+                            <span class="font-medium">${item.owner || 'N/A'}</span>
+                            <span class="px-2 py-0.5 rounded-full text-xs font-semibold
+                                ${item.status === 'Issued' ? 'bg-yellow-100 text-yellow-800' : ''}
+                                ${item.status === 'In Progress' ? 'bg-blue-100 text-blue-800' : ''}
+                                ${item.status === 'Closed' ? 'bg-green-100 text-green-800' : ''}
+                            ">${item.status}</span>
+                            <span class="${isOverdue ? 'text-red-500 font-semibold' : 'text-slate-500'}">${item.dueDate || ''}</span>
+                        </div>
                     </div>
-                    <div class="flex items-center gap-2 no-print w-full sm:w-auto">
-                        <select onchange="updateActionItem(this, ${item.id}, 'status')" class="p-1 border border-slate-300 rounded-md text-sm w-full sm:w-auto">
+                    <textarea onchange="updateActionItem(${item.id}, 'followUp', this.value)" class="w-full mt-2 p-2 bg-slate-50 text-sm border rounded-md" placeholder="Detail follow up...">${item.followUp || ''}</textarea>
+                    <div class="flex gap-2 mt-2 no-print">
+                        <select onchange="updateActionItem(${item.id}, 'status', this.value)" class="p-1 border rounded-md text-sm">
                             <option value="Issued" ${item.status === 'Issued' ? 'selected' : ''}>Issued</option>
                             <option value="In Progress" ${item.status === 'In Progress' ? 'selected' : ''}>In Progress</option>
                             <option value="Closed" ${item.status === 'Closed' ? 'selected' : ''}>Closed</option>
                         </select>
-                        <button onclick="removeActionItem(${item.id})" class="text-red-500 hover:text-red-700 p-2 rounded-full">&times;</button>
+                        <button onclick="removeActionItem(${item.id})" class="text-slate-400 hover:text-red-500 text-xs">Hapus</button>
                     </div>
-                    <div class="print-only hidden text-sm font-semibold">Status: ${item.status}</div>
                 </div>
-                <div class="no-print">
-                    <textarea oninput="updateActionItem(this, ${item.id}, 'detailFollowUp')" class="w-full mt-1 p-2 border border-slate-300 rounded-lg text-sm" rows="2" placeholder="Detail Follow-up...">${item.detailFollowUp}</textarea>
-                </div>
-                <div class="print-only hidden text-sm"><p><strong>Follow-up:</strong><br>${item.detailFollowUp.replace(/\n/g, '<br>') || 'N/A'}</p></div>`;
-            list.appendChild(itemDiv);
+            `;
         });
     }
 
     function addActionItem() {
-        const desc = document.getElementById('action-item-desc').value.trim();
-        const owner = document.getElementById('action-item-owner').value;
-        const dueDate = document.getElementById('action-item-due-date').value;
+        const descInput = document.getElementById('action-item-desc');
+        const ownerSelect = document.getElementById('action-item-owner');
+        const dueDateInput = document.getElementById('action-item-due-date');
 
-        if (desc && owner && owner !== "Pilih Penanggung Jawab...") {
-            const newId = appData.currentMeeting.actionItems.length > 0 ? Math.max(...appData.currentMeeting.actionItems.map(a => a.id)) + 1 : 1;
-            appData.currentMeeting.actionItems.push({ id: newId, desc, owner, dueDate, status: 'Issued', detailFollowUp: '' });
-            renderActionItems();
-            document.getElementById('action-item-desc').value = '';
-            document.getElementById('action-item-due-date').value = '';
-        } else {
-            alert('Deskripsi dan Penanggung Jawab wajib diisi.');
+        if (!descInput.value.trim() || !appData.currentMeeting) return;
+
+        const newItem = {
+            id: Date.now(),
+            description: descInput.value.trim(),
+            owner: ownerSelect.value,
+            dueDate: dueDateInput.value,
+            status: 'Issued',
+            followUp: ''
+        };
+        appData.currentMeeting.actionItems.push(newItem);
+        renderActionItems();
+
+        descInput.value = '';
+        ownerSelect.selectedIndex = 0;
+        dueDateInput.value = '';
+    }
+
+    function updateActionItem(itemId, field, value) {
+        if (!appData.currentMeeting) return;
+        const item = appData.currentMeeting.actionItems.find(i => i.id === itemId);
+        if (item) {
+            item[field] = value;
+            renderActionItems(); // Re-render untuk update tampilan (misal: warna, coretan)
         }
     }
 
     function removeActionItem(itemId) {
-        appData.currentMeeting.actionItems = appData.currentMeeting.actionItems.filter(item => item.id !== itemId);
+        if (!appData.currentMeeting) return;
+        appData.currentMeeting.actionItems = appData.currentMeeting.actionItems.filter(i => i.id !== itemId);
         renderActionItems();
     }
 
-    function updateActionItem(element, itemId, field) {
-        const item = appData.currentMeeting.actionItems.find(i => i.id === itemId);
-        if (item) item[field] = element.value;
-    }
-
     function updateOwnerDropdowns() {
-        const presentAttendees = appData.currentMeeting.attendees.filter(a => a.present);
-        const ownerDropdown = document.getElementById('action-item-owner');
-        const filterDropdown = document.getElementById('filter-owner');
+        const ownerSelect = document.getElementById('action-item-owner');
+        const filterSelect = document.getElementById('filter-owner');
         
-        ownerDropdown.innerHTML = '<option>Pilih Penanggung Jawab...</option>';
-        filterDropdown.innerHTML = '<option value="All">Semua PJ</option>';
+        // Simpan nilai yang sedang dipilih
+        const currentOwnerVal = ownerSelect.value;
+        const currentFilterVal = filterSelect.value;
+        
+        ownerSelect.innerHTML = '<option value="">Pilih Penanggung Jawab...</option>';
+        filterSelect.innerHTML = '<option value="All">Semua PJ</option>';
 
-        presentAttendees.forEach(a => {
-            ownerDropdown.innerHTML += `<option value="${a.name}">${a.name}</option>`;
+        if (!appData.currentMeeting) return;
+        
+        const presentAttendees = [];
+        for (const role in appData.currentMeeting.attendees) {
+            appData.currentMeeting.attendees[role].forEach(p => {
+                if (p.present) presentAttendees.push(p.name);
+            });
+        }
+        
+        presentAttendees.sort().forEach(name => {
+            ownerSelect.innerHTML += `<option value="${name}">${name}</option>`;
+            filterSelect.innerHTML += `<option value="${name}">${name}</option>`;
         });
-        appData.attendeeMasterList.forEach(a => {
-             filterDropdown.innerHTML += `<option value="${a.name}">${a.name}</option>`;
-        });
+
+        // Kembalikan nilai yang dipilih jika masih ada di daftar
+        ownerSelect.value = currentOwnerVal;
+        filterSelect.value = currentFilterVal;
     }
 
-    // --- FUNGSI ARSIP & PENCARIAN ---
-    function openArchiveModal() { document.getElementById('archive-modal').classList.remove('hidden'); renderArchiveList(); }
-    function closeArchiveModal() { document.getElementById('archive-modal').classList.add('hidden'); }
-    
+    // --- FUNGSI CETAK ---
+    function printMeeting() {
+        window.print();
+    }
+
+    // --- FUNGSI ARSIP (MODAL) ---
+    function openArchiveModal() {
+        renderArchiveList();
+        document.getElementById('archive-modal').classList.remove('hidden');
+    }
+
+    function closeArchiveModal() {
+        document.getElementById('archive-modal').classList.add('hidden');
+    }
+
     function renderArchiveList() {
         const listEl = document.getElementById('archive-list');
-        const keyword = document.getElementById('search-archive').value.toLowerCase();
+        const searchTerm = document.getElementById('search-archive').value.toLowerCase();
         listEl.innerHTML = '';
         
         const filteredMeetings = appData.meetings.filter(m => 
-            m.topic.toLowerCase().includes(keyword) || m.notes.toLowerCase().includes(keyword)
-        ).sort((a, b) => b.id - a.id); // Urutkan terbaru di atas
+            (m.topic && m.topic.toLowerCase().includes(searchTerm)) || 
+            (m.notes && m.notes.toLowerCase().includes(searchTerm))
+        ).sort((a, b) => new Date(b.date) - new Date(a.date)); // Urutkan dari terbaru
 
         if (filteredMeetings.length === 0) {
             listEl.innerHTML = '<p class="text-slate-500 text-center">Tidak ada rapat yang ditemukan.</p>';
@@ -420,89 +681,90 @@
         });
     }
     
-    function loadMeetingFromArchive(meetingId) {
+    async function loadMeetingFromArchive(meetingId) {
+        if (appData.currentMeeting) {
+            await saveMeeting(); // Simpan pekerjaan saat ini sebelum beralih
+        }
         const meeting = appData.meetings.find(m => m.id === meetingId);
         if (meeting) {
-            saveMeeting(); // Simpan pekerjaan saat ini sebelum beralih
             loadMeetingIntoView(meeting);
         }
         closeArchiveModal();
     }
 
     // --- FUNGSI UTILITAS ---
-    function initNotes(textarea) { if (textarea.value.trim() === '') textarea.value = '• '; }
-    function handleNotesEnter(event) {
-        if (event.key === 'Enter') {
-            event.preventDefault();
-            const textarea = event.target;
-            const textToInsert = '\n• ';
-            const cursorPos = textarea.selectionStart;
-            textarea.value = textarea.value.substring(0, cursorPos) + textToInsert + textarea.value.substring(textarea.selectionEnd);
-            textarea.selectionStart = textarea.selectionEnd = cursorPos + textToInsert.length;
-        }
-    }
-    
-    function printMeeting() { window.print(); }
-    
     function showNotification(message, type = 'success') {
         const notification = document.getElementById('notification');
         notification.textContent = message;
-        notification.className = `fixed top-5 right-5 text-white py-2 px-5 rounded-lg shadow-xl transition-transform z-50 ${type === 'success' ? 'bg-green-500' : 'bg-sky-500'}`;
+        notification.className = 'fixed top-5 right-5 text-white py-2 px-5 rounded-lg shadow-xl transition-transform z-50'; // Reset class
+        if (type === 'success') {
+            notification.classList.add('bg-green-500');
+        } else {
+            notification.classList.add('bg-sky-500');
+        }
         notification.classList.remove('hidden', 'translate-x-full');
-        setTimeout(() => notification.classList.add('translate-x-full'), 3000);
+        notification.classList.add('translate-x-0');
+
+        setTimeout(() => {
+            notification.classList.remove('translate-x-0');
+            notification.classList.add('translate-x-full');
+            setTimeout(() => notification.classList.add('hidden'), 300);
+        }, 3000);
     }
 
     // --- FUNGSI EKSPOR / IMPOR ---
-    function exportData() {
-        saveMeeting(); // Pastikan data terbaru ikut tersimpan
+    async function exportData() {
+        await saveMeeting(); // Pastikan data terbaru ikut tersimpan
         const dataStr = JSON.stringify(appData, null, 2);
         const dataBlob = new Blob([dataStr], {type: "application/json"});
         const url = URL.createObjectURL(dataBlob);
         const link = document.createElement('a');
-        link.download = `mom_backup_${new Date().toISOString().slice(0,10)}.json`;
         link.href = url;
+        link.download = `mom_backup_${new Date().toISOString().split('T')[0]}.json`;
         link.click();
         URL.revokeObjectURL(url);
-        showNotification('Data berhasil diekspor!');
     }
-
+    
     function importData(event) {
         const file = event.target.files[0];
         if (!file) return;
+
         const reader = new FileReader();
         reader.onload = function(e) {
             try {
                 const importedData = JSON.parse(e.target.result);
                 // Validasi sederhana
-                if (importedData.meetings && importedData.attendeeMasterList) {
+                if (importedData.meetings && importedData.attendeeList) {
                     appData = importedData;
-                    saveAllData();
-                    initialize();
+                    // Muat rapat terakhir dari data yang diimpor
+                    const lastMeeting = appData.meetings.sort((a, b) => new Date(b.date) - new Date(a.date))[0];
+                    loadMeetingIntoView(lastMeeting);
+                    saveAllData(); // Simpan data yg diimpor
                     showNotification('Data berhasil diimpor!');
                 } else {
-                    alert('Format file tidak valid.');
+                    alert('File JSON tidak valid.');
                 }
             } catch (error) {
-                alert('Gagal membaca file. Pastikan file dalam format JSON yang benar.');
+                alert('Gagal membaca file. Pastikan format JSON benar.');
             }
         };
         reader.readAsText(file);
     }
     
-    // --- INISIALISASI ---
-    function initialize() {
-        loadAllData();
+    // --- INISIALISASI APLIKASI UTAMA (SETELAH LOGIN) ---
+    async function initializeApp() {
+        await loadAllData();
         if (appData.meetings.length === 0) {
             // Jika benar-benar baru, buat rapat pertama
             startNewMeeting();
         } else {
-            // Muat rapat terakhir yang ada di arsip
-            const lastMeeting = appData.meetings[appData.meetings.length - 1];
-            loadMeetingIntoView(lastMeeting);
+            // Muat rapat terakhir yang sedang aktif atau yang paling baru
+            const meetingToLoad = appData.currentMeeting || appData.meetings.sort((a,b) => b.id - a.id)[0];
+            loadMeetingIntoView(meetingToLoad);
         }
     }
 
-    window.onload = initialize;
+    document.addEventListener('DOMContentLoaded', initAuth);
     </script>
 </body>
 </html>
