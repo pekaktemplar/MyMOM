@@ -40,9 +40,8 @@
             .print-break-inside-avoid { page-break-inside: avoid; }
             textarea { 
                 border: 1px solid #e2e8f0 !important; 
-                /* Tampilkan seluruh isi textarea saat dicetak */
-                height: auto;
-                overflow: visible;
+                /* Tampilkan seluruh isi textarea saat dicetak (dikelola oleh JS) */
+                overflow: visible !important;
             }
         }
         /* Animasi dan style tambahan */
@@ -665,6 +664,23 @@
     function printMeeting() {
         window.print();
     }
+
+    // Menangani penyesuaian tinggi textarea secara otomatis sebelum dan sesudah mencetak
+    // untuk memastikan semua konten tercapture di PDF.
+    window.onbeforeprint = () => {
+        document.querySelectorAll('textarea').forEach(textarea => {
+            // Trik: set ke 'auto' dulu untuk mendapatkan scrollHeight yang benar, lalu set tingginya.
+            textarea.style.height = 'auto'; 
+            textarea.style.height = `${textarea.scrollHeight}px`; 
+        });
+    };
+
+    window.onafterprint = () => {
+        document.querySelectorAll('textarea').forEach(textarea => {
+            // Kembalikan ke tinggi default agar bisa di-scroll lagi di layar.
+            textarea.style.height = ''; 
+        });
+    };
 
     // --- FUNGSI ARSIP (MODAL) ---
     function openArchiveModal() {
