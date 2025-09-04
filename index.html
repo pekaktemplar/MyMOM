@@ -150,7 +150,7 @@
             <!-- Catatan Rapat -->
             <section id="notes" class="border-b pb-6 mb-6 print-break-inside-avoid">
                 <h2 class="text-xl font-semibold mb-4 text-slate-700">Notulensi / Poin Pembahasan</h2>
-                <textarea id="meeting-notes" rows="10" class="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 transition" placeholder="Tuliskan poin-poin penting hasil diskusi di sini..." onkeydown="handleNotesEnter(event)" onfocus="initNotes(this)"></textarea>
+                <textarea id="meeting-notes" rows="10" class="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 transition leading-relaxed" placeholder="Tuliskan poin-poin penting hasil diskusi di sini..." onkeydown="handleNotesEnter(event)" onfocus="initNotes(this)"></textarea>
             </section>
             
             <!-- Butir Tindak Lanjut -->
@@ -578,7 +578,7 @@
                             <span class="${isOverdue ? 'text-red-500 font-semibold' : 'text-slate-500'}">${item.dueDate || ''}</span>
                         </div>
                     </div>
-                    <textarea onchange="updateActionItem(${item.id}, 'followUp', this.value)" class="w-full mt-2 p-2 bg-slate-50 text-sm border rounded-md" placeholder="Detail follow up...">${item.followUp || ''}</textarea>
+                    <textarea onchange="updateActionItem(${item.id}, 'followUp', this.value)" class="w-full mt-2 p-2 bg-slate-50 text-sm border rounded-md leading-relaxed" placeholder="Detail follow up...">${item.followUp || ''}</textarea>
                     <div class="flex gap-2 mt-2 no-print">
                         <select onchange="updateActionItem(${item.id}, 'status', this.value)" class="p-1 border rounded-md text-sm">
                             <option value="Issued" ${item.status === 'Issued' ? 'selected' : ''}>Issued</option>
@@ -668,19 +668,28 @@
     // Menangani penyesuaian tinggi textarea secara otomatis sebelum dan sesudah mencetak
     // untuk memastikan semua konten tercapture di PDF.
     window.onbeforeprint = () => {
+        // Sebelum mencetak, paksa semua textarea untuk menyesuaikan tingginya
+        // agar seluruh kontennya terlihat dan bisa tercetak.
         document.querySelectorAll('textarea').forEach(textarea => {
-            // Trik: set ke 'auto' dulu untuk mendapatkan scrollHeight yang benar, lalu set tingginya.
-            textarea.style.height = 'auto'; 
-            textarea.style.height = `${textarea.scrollHeight}px`; 
+            // Simpan tinggi asli jika ada, untuk dikembalikan nanti
+            if (!textarea.dataset.originalHeight) {
+                textarea.dataset.originalHeight = textarea.style.height;
+            }
+            // Atur tinggi secara dinamis berdasarkan konten di dalamnya
+            textarea.style.height = 'auto'; // Reset tinggi untuk mendapatkan scrollHeight yang akurat
+            textarea.style.height = `${textarea.scrollHeight}px`; // Set tinggi sesuai konten
         });
     };
 
     window.onafterprint = () => {
+        // Setelah mencetak, kembalikan tinggi semua textarea ke kondisi semula
+        // agar scrollbar muncul kembali di layar.
         document.querySelectorAll('textarea').forEach(textarea => {
-            // Kembalikan ke tinggi default agar bisa di-scroll lagi di layar.
-            textarea.style.height = ''; 
+            textarea.style.height = textarea.dataset.originalHeight || '';
+            delete textarea.dataset.originalHeight; // Hapus data sementara
         });
     };
+
 
     // --- FUNGSI ARSIP (MODAL) ---
     function openArchiveModal() {
