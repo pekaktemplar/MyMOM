@@ -204,7 +204,7 @@
         </main>
 
         <footer class="text-center mt-8 text-slate-400 text-sm">
-            <p>&copy; 2024 Dibuat oleh Agus Budiartha</p>
+            <p>&copy; 2024 Dibuat untuk Fullerton Health Clinic Bali</p>
         </footer>
     </div>
 
@@ -431,19 +431,31 @@
     }
 
     async function startNewMeeting() {
+        // Selalu simpan rapat saat ini sebelum memulai yang baru untuk memastikan data terakhir tercatat
         if (appData.currentMeeting) {
-            await saveMeeting(); // Simpan rapat saat ini sebelum membuat yang baru
+            await saveMeeting();
         }
         
-        // Dapatkan rapat terakhir berdasarkan tanggal, bukan posisi array
-        const lastMeeting = appData.meetings.length > 0 ? [...appData.meetings].sort((a, b) => new Date(b.date) - new Date(a.date))[0] : null;
-        const openActionItems = lastMeeting && lastMeeting.actionItems ? lastMeeting.actionItems.filter(item => item.status !== 'Closed') : [];
+        console.log("Memulai proses rapat baru...");
+        
+        // Dapatkan rapat terakhir yang valid (berdasarkan tanggal) untuk memeriksa butir aksinya
+        const lastMeeting = appData.meetings.length > 0 
+            ? [...appData.meetings].sort((a, b) => new Date(b.date) - new Date(a.date))[0] 
+            : null;
+        console.log("Rapat terakhir ditemukan:", lastMeeting);
+
+        const openActionItems = lastMeeting && lastMeeting.actionItems 
+            ? lastMeeting.actionItems.filter(item => item.status !== 'Closed') 
+            : [];
+        console.log(`Ditemukan ${openActionItems.length} butir aksi yang belum selesai.`, openActionItems);
 
         if (openActionItems.length > 0) {
-            // Jika ada item aksi terbuka, tampilkan modal konfirmasi
+            // Jika ada butir aksi yang belum selesai, tampilkan modal konfirmasi
+            console.log("Menampilkan modal konfirmasi.");
             showNewMeetingConfirmation(openActionItems);
         } else {
             // Jika tidak, langsung buat rapat baru yang kosong
+            console.log("Tidak ada butir aksi terbuka. Membuat rapat baru yang kosong.");
             createNewMeeting([]);
         }
     }
@@ -514,11 +526,11 @@
         medicalListEl.innerHTML = '';
         operationalListEl.innerHTML = '';
 
-        if (!appData.currentMeeting) return;
+        if (!appData.currentMeeting || !appData.currentMeeting.attendees) return;
         
         const currentAttendees = appData.currentMeeting.attendees;
 
-        currentAttendees.medical.forEach(attendee => {
+        (currentAttendees.medical || []).forEach(attendee => {
             medicalListEl.innerHTML += `
                 <div class="flex items-center justify-between">
                     <label class="flex items-center gap-2 text-slate-700">
@@ -529,7 +541,7 @@
                 </div>`;
         });
         
-        currentAttendees.operational.forEach(attendee => {
+        (currentAttendees.operational || []).forEach(attendee => {
             operationalListEl.innerHTML += `
                 <div class="flex items-center justify-between">
                     <label class="flex items-center gap-2 text-slate-700">
@@ -609,7 +621,7 @@
     function renderActionItems() {
         const listEl = document.getElementById('action-items-list');
         listEl.innerHTML = '';
-        if (!appData.currentMeeting) return;
+        if (!appData.currentMeeting || !appData.currentMeeting.actionItems) return;
 
         const ownerFilter = document.getElementById('filter-owner').value;
         const statusFilter = document.getElementById('filter-status').value;
@@ -764,11 +776,11 @@
         ownerSelect.innerHTML = '<option value="">Pilih Penanggung Jawab...</option>';
         filterSelect.innerHTML = '<option value="All">Semua PJ</option>';
 
-        if (!appData.currentMeeting) return;
+        if (!appData.currentMeeting || !appData.currentMeeting.attendees) return;
         
         const presentAttendees = [];
         for (const role in appData.currentMeeting.attendees) {
-            appData.currentMeeting.attendees[role].forEach(p => {
+            (appData.currentMeeting.attendees[role] || []).forEach(p => {
                 if (p.present) presentAttendees.push(p.name);
             });
         }
@@ -931,7 +943,7 @@
             createNewMeeting([]);
         } else {
             // Muat rapat terakhir yang sedang aktif atau yang paling baru
-            const meetingToLoad = appData.currentMeeting || appData.meetings.sort((a,b) => b.id - a.id)[0];
+            const meetingToLoad = appData.currentMeeting || [...appData.meetings].sort((a,b) => new Date(b.date) - new Date(a.date))[0];
             loadMeetingIntoView(meetingToLoad);
         }
     }
